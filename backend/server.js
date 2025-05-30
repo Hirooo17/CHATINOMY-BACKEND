@@ -38,36 +38,68 @@ io.on('connection', (socket) => {
     const userId = socket.id;
     userSockets.set(userId, { socket, userData });
 
+    // Clean up any existing presence first
+    waitingUsers.delete(userId);
+    
+    // Remove user from any existing rooms
+    for (const [roomId, room] of activeRooms.entries()) {
+      if (room.users.includes(userId)) {
+        const partnerId = room.users.find(id => id !== userId);
+        if (partnerId && userSockets.has(partnerId)) {
+          userSockets.get(partnerId).socket.emit('partnerLeft');
+        }
+        activeRooms.delete(roomId);
+        socket.leave(roomId);
+        break;
+      }
+    }
+
     // If there's someone waiting, pair them
     if (waitingUsers.size > 0) {
       const partnerId = waitingUsers.values().next().value;
-      waitingUsers.delete(partnerId);
       
-      // Create a room for the pair
-      const roomId = uuidv4();
-      const partnerSocket = userSockets.get(partnerId).socket;
-      
-      // Join both users to the room
-      socket.join(roomId);
-      partnerSocket.join(roomId);
-      
-      // Store the room info
-      activeRooms.set(roomId, {
-        users: [userId, partnerId],
-        createdAt: new Date()
-      });
-      
-      // Notify both users they found a partner
-      socket.emit('partnerFound', { roomId, partnerId });
-      partnerSocket.emit('partnerFound', { roomId, partnerId: userId });
-      
-      console.log(`Room ${roomId} created for ${userId} and ${partnerId}`);
-    } else {
-      // Add user to waiting queue
-      waitingUsers.add(userId);
-      socket.emit('waitingForPartner');
-      console.log(`User ${userId} added to waiting queue`);
+      // Make sure we're not pairing with ourselves
+      if (partnerId !== userId) {
+        waitingUsers.delete(partnerId);
+        
+        // Verify partner socket still exists
+        const partnerSocketData = userSockets.get(partnerId);
+        if (partnerSocketData && partnerSocketData.socket.connected) {
+          // Create a room for the pair
+          const roomId = uuidv4();
+          const partnerSocket = partnerSocketData.socket;
+          
+          // Join both users to the room
+          socket.join(roomId);
+          partnerSocket.join(roomId);
+          
+          // Store the room info
+          activeRooms.set(roomId, {
+            users: [userId, partnerId],
+            createdAt: new Date()
+          });
+          
+          // Notify both users they found a partner
+          socket.emit('partnerFound', { roomId, partnerId });
+          partnerSocket.emit('partnerFound', { roomId, partnerId: userId });
+          
+          console.log(`Room ${roomId} created for ${userId} and ${partnerId}`);
+          return;
+        } else {
+          // Partner socket is invalid, remove from waiting
+          waitingUsers.delete(partnerId);
+          userSockets.delete(partnerId);
+        }
+      } else {
+        // Remove self from waiting users if somehow we got in there
+        waitingUsers.delete(userId);
+      }
     }
+    
+    // Add user to waiting queue if no valid partner found
+    waitingUsers.add(userId);
+    socket.emit('waitingForPartner');
+    console.log(`User ${userId} added to waiting queue`);
   });
 
   // Handle sending messages
@@ -95,6 +127,13 @@ io.on('connection', (socket) => {
 
   socket.on('leaveChat', ({ roomId }) => {
     handleUserLeave(socket.id, roomId);
+  });
+
+  // Handle canceling search
+  socket.on('cancelSearch', () => {
+    const userId = socket.id;
+    waitingUsers.delete(userId);
+    console.log(`User ${userId} canceled search and removed from queue`);
   });
 });
 
@@ -140,9 +179,11 @@ app.get('/api/status', (req, res) => {
     activeRooms: activeRooms.size
   });
 });
+
 app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to the CHATONIMY API' });
+  res.send('CHATONIMY server is running!');
 });
+
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`CHATONIMY server running on port ${PORT}`);
