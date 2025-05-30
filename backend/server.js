@@ -12,7 +12,8 @@ const io = socketIo(server, {
   cors: {
     origin: "https://chatinomy.vercel.app/",
     methods: ["GET", "POST"]
-  }
+  },
+  
 });
 
 // Middleware
@@ -143,4 +144,5 @@ app.get('/', (req, res) => {
 });
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`CHATONIMY server running on port ${PORT}
+  console.log(`CHATONIMY server running on port ${PORT}`);
+});
