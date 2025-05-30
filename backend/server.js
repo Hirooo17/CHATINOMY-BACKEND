@@ -82,6 +82,12 @@ io.on('connection', (socket) => {
           // Notify both users they found a partner
           socket.emit('partnerFound', { roomId, partnerId });
           partnerSocket.emit('partnerFound', { roomId, partnerId: userId });
+
+           partnerSocket.emit('partnerFound', { 
+                      roomId, 
+                      partnerId: userId,
+                      partnerName: userData.name || 'Stranger' 
+                    });
           
           console.log(`Room ${roomId} created for ${userId} and ${partnerId}`);
           return;
