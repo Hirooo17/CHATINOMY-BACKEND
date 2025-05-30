@@ -10,7 +10,8 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "https://chatinomy.vercel.app/",
+    origin: "*",
+    withCredentials: true,
     methods: ["GET", "POST"]
   },
   
