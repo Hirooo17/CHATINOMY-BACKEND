@@ -79,24 +79,13 @@ io.on('connection', (socket) => {
             createdAt: new Date()
           });
           
-          // Get user data for both users
-          const currentUserData = userSockets.get(userId).userData;
-          const partnerUserData = userSockets.get(partnerId).userData;
+          // Notify both users they found a partner
+          socket.emit('partnerFound', { roomId, partnerId });
+          partnerSocket.emit('partnerFound', { roomId, partnerId: userId });
+
+           
           
-          // Notify both users they found a partner with names
-          socket.emit('partnerFound', { 
-            roomId, 
-            partnerId,
-            partnerName: partnerUserData.name || 'Stranger' 
-          });
-          
-          partnerSocket.emit('partnerFound', { 
-            roomId, 
-            partnerId: userId,
-            partnerName: currentUserData.name || 'Stranger' 
-          });
-          
-          console.log(`Room ${roomId} created for ${userId} (${currentUserData.name}) and ${partnerId} (${partnerUserData.name})`);
+          console.log(`Room ${roomId} created for ${userId} and ${partnerId}`);
           return;
         } else {
           // Partner socket is invalid, remove from waiting
@@ -112,7 +101,7 @@ io.on('connection', (socket) => {
     // Add user to waiting queue if no valid partner found
     waitingUsers.add(userId);
     socket.emit('waitingForPartner');
-    console.log(`User ${userId} (${userData.name}) added to waiting queue`);
+    console.log(`User ${userId} added to waiting queue`);
   });
 
   // Handle sending messages
